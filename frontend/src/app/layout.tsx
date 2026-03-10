@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import { Anton, Roboto_Mono } from 'next/font/google'
+import dynamic from 'next/dynamic'
 import './globals.css'
-import { Providers } from './providers'
 import { Navigation } from '@/components/navigation/Navigation'
 import { AmbientBackground } from '@/components/AmbientBackground'
+
+// WalletConnect uses indexedDB which doesn't exist on the server — load client-only
+const Providers = dynamic(() => import('./providers').then(m => m.Providers), { ssr: false })
 
 const anton = Anton({
   subsets: ['latin'],

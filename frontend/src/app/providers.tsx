@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -12,18 +12,21 @@ import '@rainbow-me/rainbowkit/styles.css'
 const queryClient = new QueryClient()
 
 export function Providers({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           theme={darkTheme({
-            accentColor: '#f59e0b',        // amber — matches FlashBets gold
+            accentColor: '#f59e0b',
             accentColorForeground: 'black',
             borderRadius: 'medium',
           })}
           locale="en-US"
         >
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>{mounted ? children : null}</ToastProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
