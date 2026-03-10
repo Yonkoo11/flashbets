@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlashBets - Elevated Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Deep, rich dark palette */
+      --void: #030305;
+      --abyss: #08080c;
+      --obsidian: #0d0d12;
+      --slate: #16161d;
+      --graphite: #1e1e26;
+
+      /* The signature amber/gold - refined */
+      --ember: #c4841d;
+      --flame: #e09422;
+      --gold: #f5a623;
+      --honey: #ffc857;
+      --gold-glow: rgba(245, 166, 35, 0.4);
+
+      /* Signal colors */
+      --pulse-green: #00d97e;
+      --pulse-green-dim: rgba(0, 217, 126, 0.15);
+      --alert-red: #ff3b5c;
+      --alert-red-dim: rgba(255, 59, 92, 0.15);
+
+      /* Text */
+      --white: #ffffff;
+      --smoke: rgba(255, 255, 255, 0.85);
+      --ash: rgba(255, 255, 255, 0.55);
+      --ghost: rgba(255, 255, 255, 0.25);
+
+      /* Typography */
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body: 'Instrument Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html {
+      font-size: 16px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--void);
+      color: var(--white);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* === ATMOSPHERIC LAYERS === */
+    .atmosphere {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Deep gradient base */
+    .atmosphere::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 120% 60% at 50% 0%, rgba(245, 166, 35, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 100% at 100% 100%, rgba(245, 166, 35, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 80% at 0% 80%, rgba(0, 217, 126, 0.02) 0%, transparent 50%);
+    }
+
+    /* Scanline overlay */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+      );
+      opacity: 0.5;
+    }
+
+    /* Grain texture */
+    .grain {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9998;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* === NAVIGATION === */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: 0 32px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, var(--abyss) 0%, transparent 100%);
+    }
+
+    .nav::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 32px;
+      right: 32px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--ghost), transparent);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--flame) 0%, var(--ember) 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--void);
+      box-shadow:
+        0 4px 20px rgba(245, 166, 35, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 26px;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, var(--white) 0%, var(--smoke) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-link {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color: var(--ash);
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .nav-link:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .nav-link.active {
+      color: var(--gold);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    .connect-btn {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--void);
+      background: linear-gradient(135deg, var(--gold) 0%, var(--ember) 100%);
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(245, 166, 35, 0.25);
+    }
+
+    .connect-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(245, 166, 35, 0.35);
+    }
+
+    /* === MAIN APP === */
+    .app {
+      position: relative;
+      z-index: 10;
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 100px 24px 60px;
+      min-height: 100vh;
+    }
+
+    /* === MARKET SELECTOR === */
+    .markets {
+      display: flex;
+      background: var(--obsidian);
+      border: 1px solid var(--ghost);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 40px;
+    }
+
+    .market-btn {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ash);
+      background: transparent;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .market-btn:hover:not(.active):not(:disabled) {
+      color: var(--smoke);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .market-btn.active {
+      background: linear-gradient(135deg, var(--flame) 0%, var(--ember) 100%);
+      color: var(--void);
+      font-weight: 700;
+      box-shadow: 0 4px 24px rgba(245, 166, 35, 0.3);
+    }
+
+    .market-btn:disabled {
+      cursor: not-allowed;
+    }
+
+    .soon-badge {
+      font-size: 9px;
+      font-weight: 600;
+      background: var(--graphite);
+      color: var(--ash);
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* === THE COUNTDOWN - THE HERO === */
+    .countdown-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+
+    .countdown-ring {
+      position: relative;
+      width: 280px;
+      height: 280px;
+    }
+
+    /* Outer decorative ring */
+    .countdown-ring::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        var(--ember) 0deg,
+        var(--gold) 90deg,
+        var(--ember) 180deg,
+        var(--gold) 270deg,
+        var(--ember) 360deg
+      );
+      opacity: 0.15;
+      animation: ringRotate 20s linear infinite;
+    }
+
+    @keyframes ringRotate {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Main countdown background */
+    .countdown-bg {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, var(--slate) 0%, var(--obsidian) 60%, var(--abyss) 100%);
+      border: 2px solid var(--graphite);
+      box-shadow:
+        0 0 80px rgba(245, 166, 35, 0.1),
+        inset 0 0 60px rgba(0, 0, 0, 0.5),
+        inset 0 2px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    /* Progress ring */
+    .countdown-progress {
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+    }
+
+    .countdown-progress svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .countdown-progress circle {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    .progress-track {
+      stroke: var(--graphite);
+    }
+
+    .progress-fill {
+      stroke: url(#goldGradient);
+      stroke-dasharray: 800;
+      stroke-dashoffset: 266; /* 33% remaining */
+      filter: drop-shadow(0 0 8px var(--gold-glow));
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    /* Timer value */
+    .countdown-value {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timer-digits {
+      font-family: var(--font-display);
+      font-size: 96px;
+      line-height: 1;
+      color: var(--gold);
+      text-shadow:
+        0 0 40px var(--gold-glow),
+        0 0 80px rgba(245, 166, 35, 0.2);
+      letter-spacing: -2px;
+      animation: digitPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes digitPulse {
+      0%, 100% {
+        text-shadow: 0 0 40px var(--gold-glow), 0 0 80px rgba(245, 166, 35, 0.2);
+        opacity: 1;
+      }
+      50% {
+        text-shadow: 0 0 60px var(--gold-glow), 0 0 120px rgba(245, 166, 35, 0.3);
+        opacity: 0.95;
+      }
+    }
+
+    .timer-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--ash);
+      margin-top: 8px;
+    }
+
+    /* Status indicator */
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--pulse-green);
+      border-radius: 50%;
+      margin-top: 24px;
+      box-shadow: 0 0 20px var(--pulse-green);
+      animation: statusPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes statusPulse {
+      0%, 100% {
+        box-shadow: 0 0 15px var(--pulse-green);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 30px var(--pulse-green), 0 0 50px rgba(0, 217, 126, 0.3);
+        transform: scale(1.1);
+      }
+    }
+
+    /* === PRICE DISPLAY === */
+    .price-card {
+      background: linear-gradient(145deg, var(--slate) 0%, var(--obsidian) 100%);
+      border: 1px solid var(--graphite);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .price-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--ghost), transparent);
+    }
+
+    .price-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .price-pair {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: var(--ash);
+      text-transform: uppercase;
+    }
+
+    .price-value {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.5px;
+    }
+
+    .price-change {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+    }
+
+    .price-change.negative {
+      color: var(--alert-red);
+      background: var(--alert-red-dim);
+    }
+
+    .price-change.positive {
+      color: var(--pulse-green);
+      background: var(--pulse-green-dim);
+    }
+
+    /* === DIRECTION BUTTONS === */
+    .direction-section {
+      margin-bottom: 28px;
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ash);
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .directions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .dir-btn {
+      position: relative;
+      padding: 28px 24px;
+      border-radius: 14px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      overflow: hidden;
+    }
+
+    .dir-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .dir-btn.up {
+      background: linear-gradient(145deg, var(--obsidian) 0%, var(--abyss) 100%);
+      border-color: rgba(0, 217, 126, 0.2);
+    }
+
+    .dir-btn.up::before {
+      background: linear-gradient(145deg, rgba(0, 217, 126, 0.1) 0%, transparent 100%);
+    }
+
+    .dir-btn.up:hover {
+      border-color: rgba(0, 217, 126, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 217, 126, 0.15);
+    }
+
+    .dir-btn.up:hover::before {
+      opacity: 1;
+    }
+
+    .dir-btn.up.selected {
+      border-color: var(--pulse-green);
+      box-shadow:
+        0 0 30px rgba(0, 217, 126, 0.2),
+        inset 0 0 30px rgba(0, 217, 126, 0.05);
+    }
+
+    .dir-btn.down {
+      background: linear-gradient(145deg, var(--obsidian) 0%, var(--abyss) 100%);
+      border-color: rgba(255, 59, 92, 0.2);
+    }
+
+    .dir-btn.down::before {
+      background: linear-gradient(145deg, rgba(255, 59, 92, 0.1) 0%, transparent 100%);
+    }
+
+    .dir-btn.down:hover {
+      border-color: rgba(255, 59, 92, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(255, 59, 92, 0.15);
+    }
+
+    .dir-btn.down:hover::before {
+      opacity: 1;
+    }
+
+    .dir-arrow {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .dir-btn.up .dir-arrow { color: var(--pulse-green); }
+    .dir-btn.down .dir-arrow { color: var(--alert-red); }
+
+    .dir-label {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 24px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .dir-btn.up .dir-label { color: var(--pulse-green); }
+    .dir-btn.down .dir-label { color: var(--alert-red); }
+
+    .dir-odds {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ash);
+    }
+
+    /* === STAKE AMOUNTS === */
+    .stake-section {
+      margin-bottom: 28px;
+    }
+
+    .stake-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .stake-btn {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--smoke);
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      padding: 16px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .stake-btn:hover {
+      background: var(--slate);
+      border-color: var(--ghost);
+      transform: translateY(-1px);
+    }
+
+    .stake-btn.selected {
+      background: linear-gradient(135deg, var(--ember) 0%, var(--flame) 100%);
+      border-color: var(--gold);
+      color: var(--void);
+      box-shadow: 0 4px 20px rgba(245, 166, 35, 0.25);
+    }
+
+    /* === EXECUTE BUTTON === */
+    .execute-section {
+      margin-bottom: 40px;
+    }
+
+    .payout-preview {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: var(--obsidian);
+      border: 1px solid var(--graphite);
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .payout-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ash);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .payout-value {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--pulse-green);
+    }
+
+    .execute-btn {
+      width: 100%;
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: var(--void);
+      background: linear-gradient(135deg, var(--gold) 0%, var(--ember) 100%);
+      border: none;
+      padding: 22px 32px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow:
+        0 4px 30px rgba(245, 166, 35, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .execute-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--honey) 0%, var(--gold) 100%);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .execute-btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 8px 40px rgba(245, 166, 35, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .execute-btn:hover::before {
+      opacity: 1;
+    }
+
+    .execute-btn span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* === FEED SECTIONS === */
+    .feed-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding-bottom: 80px;
+    }
+
+    .feed-section {
+      background: linear-gradient(145deg, var(--slate) 0%, var(--obsidian) 100%);
+      border: 1px solid var(--graphite);
+      border-radius: 16px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feed-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--ghost), transparent);
+    }
+
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .feed-title {
+      font-family: var(--font-body);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--pulse-green);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--pulse-green);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .feed-link {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--gold);
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+
+    .feed-link:hover {
+      opacity: 0.8;
+    }
+
+    /* Activity rows */
+    .activity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .activity-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .activity-row:hover {
+      background: rgba(0, 0, 0, 0.4);
+      transform: translateX(4px);
+    }
+
+    .activity-addr {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--ash);
+    }
+
+    .activity-dir {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .activity-dir.up { color: var(--pulse-green); }
+    .activity-dir.down { color: var(--alert-red); }
+
+    .activity-amount {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--white);
+    }
+
+    .activity-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ghost);
+    }
+
+    /* Results grid */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    .result-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 18px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .result-tile:hover {
+      transform: translateY(-2px);
+    }
+
+    .result-tile.won-up {
+      border-color: rgba(0, 217, 126, 0.2);
+      background: linear-gradient(145deg, rgba(0, 217, 126, 0.08) 0%, transparent 100%);
+    }
+
+    .result-tile.won-down {
+      border-color: rgba(255, 59, 92, 0.2);
+      background: linear-gradient(145deg, rgba(255, 59, 92, 0.08) 0%, transparent 100%);
+    }
+
+    .result-round {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ghost);
+    }
+
+    .result-arrow {
+      font-size: 24px;
+    }
+
+    .result-tile.won-up .result-arrow { color: var(--pulse-green); }
+    .result-tile.won-down .result-arrow { color: var(--alert-red); }
+
+    .result-change {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ash);
+    }
+
+    /* Mini leaderboard */
+    .mini-lb {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mini-row {
+      display: grid;
+      grid-template-columns: 36px 1fr auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .mini-row:hover {
+      background: rgba(0, 0, 0, 0.4);
+      transform: translateX(4px);
+    }
+
+    .mini-rank {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .mini-rank.gold { color: #ffd700; }
+    .mini-rank.silver { color: #c0c0c0; }
+    .mini-rank.bronze { color: #cd7f32; }
+
+    .mini-addr {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--ash);
+    }
+
+    .mini-winrate {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ghost);
+    }
+
+    .mini-profit {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--pulse-green);
+    }
+
+    /* Market stats */
+    .market-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .mstat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 12px;
+      background: linear-gradient(145deg, rgba(245, 166, 35, 0.04) 0%, transparent 100%);
+      border: 1px solid rgba(245, 166, 35, 0.1);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .mstat:hover {
+      border-color: rgba(245, 166, 35, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .mstat-value {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--gold);
+    }
+
+    .mstat-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--ghost);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* === FOOTER === */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      background: linear-gradient(to top, var(--abyss) 0%, transparent 100%);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ghost);
+      z-index: 100;
+    }
+
+    .footer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .footer-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--pulse-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--pulse-green);
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 640px) {
+      .nav {
+        padding: 0 20px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .app {
+        padding: 90px 16px 60px;
+      }
+
+      .countdown-ring {
+        width: 240px;
+        height: 240px;
+      }
+
+      .timer-digits {
+        font-size: 72px;
+      }
+
+      .results-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .results-grid .result-tile:nth-child(4),
+      .results-grid .result-tile:nth-child(5) {
+        display: none;
+      }
+
+      .market-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="atmosphere"></div>
+  <div class="scanlines"></div>
+  <div class="grain"></div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="logo">
+      <div class="logo-mark">F</div>
+      <span class="logo-text">FLASHBETS</span>
+    </div>
+    <div class="nav-links">
+      <a href="#" class="nav-link active">App</a>
+      <a href="#" class="nav-link">Leaderboard</a>
+      <a href="#" class="nav-link">History</a>
+    </div>
+    <button class="connect-btn">Connect</button>
+  </nav>
+
+  <!-- Main App -->
+  <main class="app">
+    <!-- Market Selector -->
+    <div class="markets">
+      <button class="market-btn active">BTC/USD</button>
+      <button class="market-btn" disabled>ETH/USD<span class="soon-badge">Soon</span></button>
+      <button class="market-btn" disabled>SOL/USD<span class="soon-badge">Soon</span></button>
+    </div>
+
+    <!-- Countdown Timer -->
+    <div class="countdown-container">
+      <div class="countdown-ring">
+        <div class="countdown-bg"></div>
+        <div class="countdown-progress">
+          <svg viewBox="0 0 264 264">
+            <defs>
+              <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#f5a623"/>
+                <stop offset="100%" style="stop-color:#c4841d"/>
+              </linearGradient>
+            </defs>
+            <circle class="progress-track" cx="132" cy="132" r="127"/>
+            <circle class="progress-fill" cx="132" cy="132" r="127"/>
+          </svg>
+        </div>
+        <div class="countdown-value">
+          <span class="timer-digits">35</span>
+          <span class="timer-label">Seconds Remaining</span>
+        </div>
+      </div>
+      <div class="status-dot"></div>
+    </div>
+
+    <!-- Price Display -->
+    <div class="price-card">
+      <div class="price-info">
+        <span class="price-pair">BTC/USD</span>
+        <span class="price-value">$82,713.00</span>
+      </div>
+      <div class="price-change negative">
+        <span>-5.83%</span>
+      </div>
+    </div>
+
+    <!-- Direction Selection -->
+    <div class="direction-section">
+      <div class="section-label">Predict Direction</div>
+      <div class="directions">
+        <button class="dir-btn up selected">
+          <span class="dir-arrow">▲</span>
+          <span class="dir-label">GREEN</span>
+          <span class="dir-odds">1.95× payout</span>
+        </button>
+        <button class="dir-btn down">
+          <span class="dir-arrow">▼</span>
+          <span class="dir-label">RED</span>
+          <span class="dir-odds">1.95× payout</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stake Amount -->
+    <div class="stake-section">
+      <div class="section-label">Stake Amount</div>
+      <div class="stake-grid">
+        <button class="stake-btn">10</button>
+        <button class="stake-btn selected">50</button>
+        <button class="stake-btn">100</button>
+        <button class="stake-btn">ALL</button>
+      </div>
+    </div>
+
+    <!-- Execute -->
+    <div class="execute-section">
+      <div class="payout-preview">
+        <span class="payout-label">Potential Payout</span>
+        <span class="payout-value">+47.50</span>
+      </div>
+      <button class="execute-btn">
+        <span>DETONATE</span>
+      </button>
+    </div>
+
+    <!-- Feed Sections -->
+    <div class="feed-wrapper">
+      <!-- Live Activity -->
+      <section class="feed-section">
+        <div class="feed-header">
+          <h2 class="feed-title">
+            <span class="live-dot"></span>
+            Live Activity
+          </h2>
+        </div>
+        <div class="activity-list">
+          <div class="activity-row">
+            <span class="activity-addr">0x7a3f...9e21</span>
+            <span class="activity-dir up">▲ GREEN</span>
+            <span class="activity-amount">100</span>
+            <span class="activity-time">2s ago</span>
+          </div>
+          <div class="activity-row">
+            <span class="activity-addr">0x4b2c...1d8a</span>
+            <span class="activity-dir down">▼ RED</span>
+            <span class="activity-amount">50</span>
+            <span class="activity-time">5s ago</span>
+          </div>
+          <div class="activity-row">
+            <span class="activity-addr">0x9f1e...3c7b</span>
+            <span class="activity-dir up">▲ GREEN</span>
+            <span class="activity-amount">250</span>
+            <span class="activity-time">12s ago</span>
+          </div>
+          <div class="activity-row">
+            <span class="activity-addr">0x2d8a...7f4e</span>
+            <span class="activity-dir up">▲ GREEN</span>
+            <span class="activity-amount">75</span>
+            <span class="activity-time">18s ago</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Results -->
+      <section class="feed-section">
+        <div class="feed-header">
+          <h2 class="feed-title">Recent Results</h2>
+        </div>
+        <div class="results-grid">
+          <div class="result-tile won-up">
+            <span class="result-round">#848</span>
+            <span class="result-arrow">▲</span>
+            <span class="result-change">+0.12%</span>
+          </div>
+          <div class="result-tile won-down">
+            <span class="result-round">#847</span>
+            <span class="result-arrow">▼</span>
+            <span class="result-change">-0.08%</span>
+          </div>
+          <div class="result-tile won-up">
+            <span class="result-round">#846</span>
+            <span class="result-arrow">▲</span>
+            <span class="result-change">+0.23%</span>
+          </div>
+          <div class="result-tile won-up">
+            <span class="result-round">#845</span>
+            <span class="result-arrow">▲</span>
+            <span class="result-change">+0.05%</span>
+          </div>
+          <div class="result-tile won-down">
+            <span class="result-round">#844</span>
+            <span class="result-arrow">▼</span>
+            <span class="result-change">-0.15%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Top Traders -->
+      <section class="feed-section">
+        <div class="feed-header">
+          <h2 class="feed-title">Top Traders</h2>
+          <a href="#" class="feed-link">View All →</a>
+        </div>
+        <div class="mini-lb">
+          <div class="mini-row">
+            <span class="mini-rank gold">#1</span>
+            <span class="mini-addr">0x1234...5678</span>
+            <span class="mini-winrate">68%</span>
+            <span class="mini-profit">+$12,500</span>
+          </div>
+          <div class="mini-row">
+            <span class="mini-rank silver">#2</span>
+            <span class="mini-addr">0xabcd...efgh</span>
+            <span class="mini-winrate">62%</span>
+            <span class="mini-profit">+$8,900</span>
+          </div>
+          <div class="mini-row">
+            <span class="mini-rank bronze">#3</span>
+            <span class="mini-addr">0x9876...5432</span>
+            <span class="mini-winrate">59%</span>
+            <span class="mini-profit">+$7,200</span>
+          </div>
+          <div class="mini-row">
+            <span class="mini-rank">#4</span>
+            <span class="mini-addr">0xdef0...1234</span>
+            <span class="mini-winrate">57%</span>
+            <span class="mini-profit">+$5,600</span>
+          </div>
+          <div class="mini-row">
+            <span class="mini-rank">#5</span>
+            <span class="mini-addr">0x5678...9abc</span>
+            <span class="mini-winrate">55%</span>
+            <span class="mini-profit">+$4,800</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Market Stats -->
+      <section class="feed-section">
+        <div class="feed-header">
+          <h2 class="feed-title">Market Stats</h2>
+        </div>
+        <div class="market-stats">
+          <div class="mstat">
+            <span class="mstat-value">$2.4M</span>
+            <span class="mstat-label">24h Volume</span>
+          </div>
+          <div class="mstat">
+            <span class="mstat-value">12,847</span>
+            <span class="mstat-label">Total Bets</span>
+          </div>
+          <div class="mstat">
+            <span class="mstat-value">847</span>
+            <span class="mstat-label">Active Users</span>
+          </div>
+          <div class="mstat">
+            <span class="mstat-value">+$8,420</span>
+            <span class="mstat-label">Biggest Win</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-item">
+      <span class="footer-dot"></span>
+      Conway Testnet
+    </div>
+    <span>Round #849</span>
+    <span>v0.1.0</span>
+  </footer>
+
+  <script>
+    // Animate timer countdown
+    let seconds = 35;
+    const timerEl = document.querySelector('.timer-digits');
+    const progressEl = document.querySelector('.progress-fill');
+
+    setInterval(() => {
+      seconds = seconds > 0 ? seconds - 1 : 60;
+      timerEl.textContent = seconds.toString().padStart(2, '0');
+
+      // Update progress ring (800 is full circumference)
+      const offset = 800 - (800 * (seconds / 60));
+      progressEl.style.strokeDashoffset = offset;
+
+      // Urgent state
+      if (seconds <= 10 && seconds > 0) {
+        timerEl.style.color = 'var(--alert-red)';
+        timerEl.style.textShadow = '0 0 40px rgba(255, 59, 92, 0.6)';
+        document.querySelector('.status-dot').style.background = 'var(--alert-red)';
+        document.querySelector('.status-dot').style.boxShadow = '0 0 20px var(--alert-red)';
+      } else {
+        timerEl.style.color = 'var(--gold)';
+        timerEl.style.textShadow = '0 0 40px var(--gold-glow)';
+        document.querySelector('.status-dot').style.background = 'var(--pulse-green)';
+        document.querySelector('.status-dot').style.boxShadow = '0 0 20px var(--pulse-green)';
+      }
+    }, 1000);
+
+    // Direction button interaction
+    document.querySelectorAll('.dir-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    // Stake button interaction
+    document.querySelectorAll('.stake-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+  </script>
+</body>
+</html>
