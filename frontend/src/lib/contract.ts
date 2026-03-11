@@ -1,7 +1,7 @@
 export const FLASHBETS_ADDRESS = {
   // Fill after deploying
   8453:  '0x0000000000000000000000000000000000000000' as `0x${string}`, // Base mainnet
-  84532: '0x96815ffF75Eed73351f0C2E6C49661ce1aC0B608' as `0x${string}`, // Base Sepolia
+  84532: '0xcA374e8bba8bd2BA0Aed26c4d425aA9aa7E058D0' as `0x${string}`, // Base Sepolia
 } as const
 
 export const FLASHBETS_ABI = [
@@ -22,6 +22,34 @@ export const FLASHBETS_ABI = [
   },
   {
     name: 'startNewMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'cancelStaleRound',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'pause',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'unpause',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'withdrawFees',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [],
@@ -122,6 +150,21 @@ export const FLASHBETS_ABI = [
     inputs: [],
     outputs: [{ type: 'uint256' }],
   },
+  // ---- Read (constants) ----
+  {
+    name: 'CANCEL_DEADLINE',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'MAX_ORACLE_AGE',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
   // ---- Events ----
   {
     name: 'MarketStarted',
@@ -149,6 +192,13 @@ export const FLASHBETS_ABI = [
       { name: 'roundId',  type: 'uint256', indexed: true  },
       { name: 'endPrice', type: 'int256',  indexed: false },
       { name: 'outcome',  type: 'bool',    indexed: false },
+    ],
+  },
+  {
+    name: 'MarketCancelled',
+    type: 'event',
+    inputs: [
+      { name: 'roundId', type: 'uint256', indexed: true },
     ],
   },
   {

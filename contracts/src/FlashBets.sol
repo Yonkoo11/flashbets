@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
@@ -13,20 +14,31 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  *
  *  Round lifecycle:
  *    1. startNewMarket()  — open, takes Chainlink snapshot as start price
- *    2. placeBet()        — open for first LOCK_THRESHOLD seconds (50s)
+ *    2. placeBetAmount()  — open for first LOCK_THRESHOLD seconds (50s)
  *    3. lockMarket()      — callable after LOCK_THRESHOLD
  *    4. resolveMarket()   — callable after ROUND_DURATION (60s), settles via Chainlink
  *    5. claimWinnings()   — winners pull their payout
+ *    OR
+ *    4b. cancelStaleRound() — callable by anyone if round is stuck past CANCEL_DEADLINE
+ *    5b. claimWinnings()  — returns original bet amount when cancelled
  */
-contract FlashBets is Ownable, ReentrancyGuard {
+contract FlashBets is Ownable, Pausable, ReentrancyGuard {
     // ============ Constants ============
 
     AggregatorV3Interface public immutable priceFeed;
 
-    uint256 public constant ROUND_DURATION  = 60 seconds;
-    uint256 public constant LOCK_THRESHOLD  = 50 seconds;
-    uint256 public constant MIN_BET         = 0.0001 ether;  // ~$0.03 at $300 ETH
-    uint256 public constant PROTOCOL_FEE_BPS = 250;          // 2.5%
+    uint256 public constant ROUND_DURATION   = 60 seconds;
+    uint256 public constant LOCK_THRESHOLD   = 50 seconds;
+    uint256 public constant MIN_BET          = 0.0001 ether;  // ~$0.03 at $300 ETH
+    uint256 public constant PROTOCOL_FEE_BPS = 250;           // 2.5%
+
+    /// @dev How long after round start before a stuck round can be cancelled.
+    ///      Gives 9 extra minutes beyond ROUND_DURATION for resolvers to act.
+    uint256 public constant CANCEL_DEADLINE = ROUND_DURATION + 9 minutes;
+
+    /// @dev Maximum age of a Chainlink price before we reject it.
+    ///      BTC/USD heartbeat on Base is 20 min; 1 hour is generous but safe.
+    uint256 public constant MAX_ORACLE_AGE = 1 hours;
 
     // ============ Types ============
 
@@ -42,6 +54,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
         uint256 downPool;     // ETH in DOWN side (wei)
         bool    outcome;      // true = UP won
         bool    outcomeSet;
+        bool    cancelled;    // true if round was cancelled via cancelStaleRound()
     }
 
     struct Bet {
@@ -60,7 +73,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
     /// @dev bets[roundId][player]
     mapping(uint256 => mapping(address => Bet)) public bets;
 
-    /// @dev archived resolved markets
+    /// @dev archived resolved/cancelled markets
     mapping(uint256 => Market) public pastMarkets;
 
     uint256 public nextRoundId = 1;
@@ -73,6 +86,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
     event BetPlaced(uint256 indexed roundId, address indexed player, bool direction, uint256 amount);
     event MarketLocked(uint256 indexed roundId);
     event MarketResolved(uint256 indexed roundId, int256 endPrice, bool outcome);
+    event MarketCancelled(uint256 indexed roundId);
     event WinningsClaimed(uint256 indexed roundId, address indexed player, uint256 payout);
     event Deposited(address indexed player, uint256 amount);
     event Withdrawn(address indexed player, uint256 amount);
@@ -83,6 +97,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
     ///   Base mainnet:  0x64c911996d3c6aC71F9B455b1e8E7266BcFbf528
     ///   Base Sepolia:  0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
     constructor(address _priceFeed) Ownable(msg.sender) {
+        require(_priceFeed != address(0), "Zero feed address");
         priceFeed = AggregatorV3Interface(_priceFeed);
     }
 
@@ -100,7 +115,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
         emit Deposited(msg.sender, msg.value);
     }
 
-    /// @notice Withdraw available balance.
+    /// @notice Withdraw available balance. Always callable — even when paused.
     function withdraw(uint256 amount) external nonReentrant {
         require(balances[msg.sender] >= amount, "Insufficient balance");
         balances[msg.sender] -= amount;
@@ -112,19 +127,19 @@ contract FlashBets is Ownable, ReentrancyGuard {
     // ============ Market Lifecycle (permissionless with time guards) ============
 
     /// @notice Start a new 60-second round. Previous round must be Resolved or Inactive.
-    function startNewMarket() external {
+    function startNewMarket() external whenNotPaused {
         require(
             currentMarket.status == MarketStatus.Inactive ||
             currentMarket.status == MarketStatus.Resolved,
             "Previous round not resolved"
         );
 
-        // Archive previous resolved market
+        // Archive previous resolved/cancelled market
         if (currentMarket.status == MarketStatus.Resolved) {
             pastMarkets[currentMarket.roundId] = currentMarket;
         }
 
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        int256 price = _getValidatedPrice();
 
         uint256 roundId = nextRoundId++;
         currentRoundId = roundId;
@@ -138,14 +153,15 @@ contract FlashBets is Ownable, ReentrancyGuard {
             upPool:     0,
             downPool:   0,
             outcome:    false,
-            outcomeSet: false
+            outcomeSet: false,
+            cancelled:  false
         });
 
         emit MarketStarted(roundId, price, block.timestamp);
     }
 
     /// @notice Lock the market — callable by anyone after LOCK_THRESHOLD seconds.
-    function lockMarket() external {
+    function lockMarket() external whenNotPaused {
         require(currentMarket.status == MarketStatus.Active, "Not active");
         require(
             block.timestamp >= currentMarket.startTime + LOCK_THRESHOLD,
@@ -157,62 +173,53 @@ contract FlashBets is Ownable, ReentrancyGuard {
 
     /// @notice Resolve the round — callable by anyone after ROUND_DURATION seconds.
     ///         Fetches current Chainlink price and compares to start price.
-    function resolveMarket() external {
+    function resolveMarket() external whenNotPaused {
         require(currentMarket.status == MarketStatus.Locked, "Not locked");
         require(
             block.timestamp >= currentMarket.startTime + ROUND_DURATION,
             "Round not complete"
         );
 
-        (, int256 endPrice,,,) = priceFeed.latestRoundData();
+        int256 endPrice = _getValidatedPrice();
 
         bool outcome = endPrice >= currentMarket.startPrice;
 
-        currentMarket.endPrice  = endPrice;
-        currentMarket.outcome   = outcome;
+        currentMarket.endPrice   = endPrice;
+        currentMarket.outcome    = outcome;
         currentMarket.outcomeSet = true;
-        currentMarket.status    = MarketStatus.Resolved;
+        currentMarket.status     = MarketStatus.Resolved;
 
         emit MarketResolved(currentMarket.roundId, endPrice, outcome);
     }
 
-    // ============ Betting ============
-
-    /// @notice Place a bet on the current active round.
-    /// @param direction true = UP, false = DOWN
-    function placeBet(bool direction) external nonReentrant {
-        require(currentMarket.status == MarketStatus.Active, "Market not active");
+    /// @notice Cancel a round that got stuck — callable by anyone after CANCEL_DEADLINE.
+    ///         Allows all bettors to recover their original bet amounts via claimWinnings().
+    function cancelStaleRound() external {
         require(
-            block.timestamp < currentMarket.startTime + LOCK_THRESHOLD,
-            "Betting is locked"
+            currentMarket.status == MarketStatus.Active ||
+            currentMarket.status == MarketStatus.Locked,
+            "Nothing to cancel"
         );
-        require(!bets[currentRoundId][msg.sender].exists, "Already bet this round");
-        require(balances[msg.sender] >= MIN_BET, "Deposit ETH first");
+        require(
+            block.timestamp >= currentMarket.startTime + CANCEL_DEADLINE,
+            "Too early to cancel"
+        );
 
-        uint256 amount = balances[msg.sender]; // all-in per round (simplest UX)
+        currentMarket.cancelled  = true;
+        currentMarket.outcomeSet = true;
+        currentMarket.status     = MarketStatus.Resolved;
 
-        bets[currentRoundId][msg.sender] = Bet({
-            direction: direction,
-            amount:    amount,
-            exists:    true
-        });
+        pastMarkets[currentMarket.roundId] = currentMarket;
 
-        if (direction) {
-            currentMarket.upPool   += amount;
-        } else {
-            currentMarket.downPool += amount;
-        }
-
-        balances[msg.sender] = 0;
-        totalVolume += amount;
-
-        emit BetPlaced(currentRoundId, msg.sender, direction, amount);
+        emit MarketCancelled(currentMarket.roundId);
     }
+
+    // ============ Betting ============
 
     /// @notice Place a specific ETH amount as a bet (drawn from balance).
     /// @param direction true = UP, false = DOWN
     /// @param amount    wei amount to bet
-    function placeBetAmount(bool direction, uint256 amount) external nonReentrant {
+    function placeBetAmount(bool direction, uint256 amount) external whenNotPaused nonReentrant {
         require(currentMarket.status == MarketStatus.Active, "Market not active");
         require(
             block.timestamp < currentMarket.startTime + LOCK_THRESHOLD,
@@ -241,6 +248,7 @@ contract FlashBets is Ownable, ReentrancyGuard {
     }
 
     /// @notice Claim winnings for a resolved round.
+    ///         If the round was cancelled, returns the original bet amount.
     function claimWinnings(uint256 roundId) external nonReentrant {
         Bet storage bet = bets[roundId][msg.sender];
         require(bet.exists, "No bet found for this round");
@@ -249,18 +257,26 @@ contract FlashBets is Ownable, ReentrancyGuard {
             ? currentMarket
             : pastMarkets[roundId];
 
-        require(market.status    == MarketStatus.Resolved, "Round not resolved");
-        require(market.outcomeSet,                          "Outcome not set");
-        require(bet.direction    == market.outcome,         "Not a winner");
+        require(market.status == MarketStatus.Resolved, "Round not resolved");
 
-        // Mark claimed before transfer (reentrancy safe via flag + nonReentrant)
+        // Mark claimed before any transfer (CEI pattern)
         bet.exists = false;
+
+        // Cancelled round: full refund, no winner/loser
+        if (market.cancelled) {
+            balances[msg.sender] += bet.amount;
+            emit WinningsClaimed(roundId, msg.sender, bet.amount);
+            return;
+        }
+
+        require(market.outcomeSet,                 "Outcome not set");
+        require(bet.direction == market.outcome,   "Not a winner");
 
         uint256 winnerPool = market.outcome ? market.upPool   : market.downPool;
         uint256 loserPool  = market.outcome ? market.downPool : market.upPool;
 
         // Winner gets back their bet + proportional share of loser pool minus fee
-        uint256 loserShare = (bet.amount * loserPool) / winnerPool;
+        uint256 loserShare = loserPool > 0 ? (bet.amount * loserPool) / winnerPool : 0;
         uint256 fee        = (loserShare * PROTOCOL_FEE_BPS) / 10_000;
         uint256 payout     = bet.amount + loserShare - fee;
 
@@ -273,11 +289,46 @@ contract FlashBets is Ownable, ReentrancyGuard {
 
     // ============ Owner ============
 
-    function withdrawFees() external onlyOwner {
+    function withdrawFees() external onlyOwner nonReentrant {
         uint256 amount = accruedFees;
+        require(amount > 0, "No fees to withdraw");
         accruedFees = 0;
         (bool ok,) = payable(owner()).call{value: amount}("");
         require(ok, "Transfer failed");
+    }
+
+    /// @notice Pause all market operations. Users can still withdraw and claim.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Resume all market operations.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // ============ Internal ============
+
+    /// @dev Fetch Chainlink price with full validation:
+    ///      - round completeness (answeredInRound >= oracleRoundId)
+    ///      - updatedAt > 0 (round is not pending)
+    ///      - freshness within MAX_ORACLE_AGE
+    ///      - price > 0
+    function _getValidatedPrice() internal view returns (int256 price) {
+        (
+            uint80 oracleRoundId,
+            int256 rawPrice,
+            ,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+
+        require(answeredInRound >= oracleRoundId, "Oracle: incomplete round");
+        require(updatedAt > 0,                    "Oracle: round not complete");
+        require(block.timestamp - updatedAt <= MAX_ORACLE_AGE, "Oracle: stale price");
+        require(rawPrice > 0,                     "Oracle: invalid price");
+
+        return rawPrice;
     }
 
     // ============ Views ============
@@ -307,10 +358,10 @@ contract FlashBets is Ownable, ReentrancyGuard {
         );
     }
 
-    /// @notice Current odds as fixed-point (195 = 1.95x). Pass 0 for current pool.
+    /// @notice Current odds as fixed-point (195 = 1.95x). Pass 0 for current pool odds.
     function getOdds(bool direction, uint256 extraAmount) external view returns (uint256) {
         uint256 upPool   = currentMarket.upPool   + (direction ? extraAmount : 0);
-        uint256 downPool = currentMarket.downPool  + (direction ? 0 : extraAmount);
+        uint256 downPool = currentMarket.downPool + (direction ? 0 : extraAmount);
         uint256 total    = upPool + downPool;
         uint256 myPool   = direction ? upPool : downPool;
 
