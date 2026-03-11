@@ -1,75 +1,28 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-
-interface HistoryEntry {
-  id: string
-  direction: 'UP' | 'DOWN'
-  amount: number
-  outcome: 'win' | 'loss'
-  profit: number
-  timestamp: number
-}
+import { useAccount } from 'wagmi'
+import { usePlayerHistory } from '@/hooks/useChainEvents'
 
 type OutcomeFilter = 'all' | 'wins' | 'losses'
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const { address } = useAccount()
+  const { history, loading } = usePlayerHistory(address)
   const [filter, setFilter] = useState<OutcomeFilter>('all')
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-    // Load history from localStorage
-    const stored = localStorage.getItem('flashbets-history')
-    if (stored) {
-      try {
-        setHistory(JSON.parse(stored))
-      } catch {
-        setHistory([])
-      }
-    }
-  }, [])
-
-  // Calculate stats
-  const stats = {
-    totalWagered: history.reduce((sum, h) => sum + h.amount, 0),
-    totalProfit: history.reduce((sum, h) => sum + h.profit, 0),
-    winRate: history.length > 0
-      ? Math.round((history.filter(h => h.outcome === 'win').length / history.length) * 100)
-      : 0,
-    totalBets: history.length,
-  }
-
-  // Filter history
   const filteredHistory = history.filter(entry => {
     if (filter === 'wins') return entry.outcome === 'win'
     if (filter === 'losses') return entry.outcome === 'loss'
     return true
   })
 
-  // Format timestamp
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
-  if (!mounted) {
-    return (
-      <div className="fb-page">
-        <div className="fb-page-header">
-          <h1 className="fb-page-title">Your History</h1>
-          <p className="fb-page-subtitle">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  const wins = history.filter(h => h.outcome === 'win')
+  const totalWagered = history.reduce((s, h) => s + h.betAmount, 0)
+  const totalPayout = history.reduce((s, h) => s + (h.payout ?? 0), 0)
+  const totalProfit = totalPayout - totalWagered
+  const winRate = history.length > 0 ? Math.round((wins.length / history.length) * 100) : 0
 
   return (
     <div className="fb-page">
@@ -82,21 +35,21 @@ export default function HistoryPage() {
         {/* Stats Grid */}
         <div className="fb-stats-grid">
           <div className="fb-stat-card">
-            <div className="fb-stat-card-value">${stats.totalWagered.toLocaleString()}</div>
+            <div className="fb-stat-card-value">{totalWagered.toFixed(4)} ETH</div>
             <div className="fb-stat-card-label">Total Wagered</div>
           </div>
           <div className="fb-stat-card">
-            <div className={`fb-stat-card-value ${stats.totalProfit >= 0 ? 'positive' : 'negative'}`}>
-              {stats.totalProfit >= 0 ? '+' : ''}${stats.totalProfit.toLocaleString()}
+            <div className={`fb-stat-card-value ${totalProfit >= 0 ? 'positive' : 'negative'}`}>
+              {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(4)} ETH
             </div>
             <div className="fb-stat-card-label">Total Profit</div>
           </div>
           <div className="fb-stat-card">
-            <div className="fb-stat-card-value">{stats.winRate}%</div>
+            <div className="fb-stat-card-value">{winRate}%</div>
             <div className="fb-stat-card-label">Win Rate</div>
           </div>
           <div className="fb-stat-card">
-            <div className="fb-stat-card-value">{stats.totalBets}</div>
+            <div className="fb-stat-card-value">{history.length}</div>
             <div className="fb-stat-card-label">Total Bets</div>
           </div>
         </div>
@@ -105,29 +58,32 @@ export default function HistoryPage() {
         <div className="fb-history-header">
           <h2 className="fb-history-title">Bet History</h2>
           <div className="fb-history-filters">
-            <button
-              className={`fb-history-filter ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </button>
-            <button
-              className={`fb-history-filter ${filter === 'wins' ? 'active' : ''}`}
-              onClick={() => setFilter('wins')}
-            >
-              Wins
-            </button>
-            <button
-              className={`fb-history-filter ${filter === 'losses' ? 'active' : ''}`}
-              onClick={() => setFilter('losses')}
-            >
-              Losses
-            </button>
+            {(['all', 'wins', 'losses'] as const).map(f => (
+              <button
+                key={f}
+                className={`fb-history-filter ${filter === f ? 'active' : ''}`}
+                onClick={() => setFilter(f)}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* History List */}
-        {filteredHistory.length === 0 ? (
+        {!address ? (
+          <div className="fb-history-empty">
+            <div className="fb-history-empty-icon">🔗</div>
+            <p className="fb-history-empty-text">Connect your wallet</p>
+            <p className="fb-history-empty-subtext">Connect to see your on-chain betting history</p>
+          </div>
+        ) : loading && history.length === 0 ? (
+          <div className="fb-history-empty">
+            <div className="fb-history-empty-icon">⏳</div>
+            <p className="fb-history-empty-text">Loading history...</p>
+            <p className="fb-history-empty-subtext">Reading events from chain</p>
+          </div>
+        ) : filteredHistory.length === 0 ? (
           <div className="fb-history-empty">
             <div className="fb-history-empty-icon">📊</div>
             <p className="fb-history-empty-text">No bets yet</p>
@@ -146,21 +102,30 @@ export default function HistoryPage() {
         ) : (
           <div className="fb-history-list">
             {filteredHistory.map((entry) => (
-              <div key={entry.id} className="fb-history-item">
+              <div key={entry.roundId.toString()} className="fb-history-item">
                 <div className={`fb-history-direction ${entry.direction.toLowerCase()}`}>
                   {entry.direction === 'UP' ? '↑' : '↓'}
                 </div>
                 <div className="fb-history-details">
-                  <div className="fb-history-amount">${entry.amount} on {entry.direction}</div>
-                  <div className="fb-history-time">{formatTime(entry.timestamp)}</div>
+                  <div className="fb-history-amount">
+                    {entry.betAmount.toFixed(4)} ETH on {entry.direction}
+                  </div>
+                  <div className="fb-history-time">Round #{entry.roundId.toString()}</div>
                 </div>
                 <div className="fb-history-result">
                   <div className={`fb-history-outcome ${entry.outcome}`}>
-                    {entry.outcome === 'win' ? 'Won' : 'Lost'}
+                    {entry.outcome === 'win' ? 'Won' : entry.outcome === 'loss' ? 'Lost' : 'Pending'}
                   </div>
-                  <div className="fb-history-pnl">
-                    {entry.profit >= 0 ? '+' : ''}${entry.profit}
-                  </div>
+                  {entry.payout !== null && (
+                    <div className="fb-history-pnl">
+                      +{entry.payout.toFixed(4)} ETH
+                    </div>
+                  )}
+                  {entry.outcome === 'loss' && (
+                    <div className="fb-history-pnl negative">
+                      -{entry.betAmount.toFixed(4)} ETH
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
