@@ -16,13 +16,16 @@ interface PriceState {
 // Chainlink BTC/USD feed has 8 decimals
 const CHAINLINK_DECIMALS = 1e8
 
-// Fetch 24h change from CoinGecko (Chainlink doesn't provide this)
+// Fetch 24h change directly from CoinGecko — no proxy needed, they support CORS
 async function fetch24hChange(): Promise<number | null> {
   try {
-    const res = await fetch('/api/price', { cache: 'no-store' })
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true',
+      { cache: 'no-store' }
+    )
     if (!res.ok) return null
     const data = await res.json()
-    return data.change ?? null
+    return data?.bitcoin?.usd_24h_change ?? null
   } catch {
     return null
   }
@@ -71,10 +74,13 @@ export function usePrice(refreshInterval = 5000) {
   const fetchCgPrice = useCallback(async () => {
     if (hasContract) return
     try {
-      const res = await fetch('/api/price', { cache: 'no-store' })
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+        { cache: 'no-store' }
+      )
       if (!res.ok) return
       const data = await res.json()
-      setCgPrice(data.price ?? null)
+      setCgPrice(data?.bitcoin?.usd ?? null)
     } catch {
       // ignore
     }
