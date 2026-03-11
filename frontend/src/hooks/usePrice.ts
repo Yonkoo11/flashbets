@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { fetchBTCPrice } from '@/lib/api'
+import { useEffect, useState, useCallback } from 'react'
+import { useReadContract, useChainId } from 'wagmi'
+import { FLASHBETS_ABI, FLASHBETS_ADDRESS } from '@/lib/contract'
 
 interface PriceState {
   price: number | null
@@ -9,49 +10,116 @@ interface PriceState {
   loading: boolean
   error: string | null
   lastUpdated: Date | null
+  source: 'chainlink' | 'coingecko' | null
+}
+
+// Chainlink BTC/USD feed has 8 decimals
+const CHAINLINK_DECIMALS = 1e8
+
+// Fetch 24h change from CoinGecko (Chainlink doesn't provide this)
+async function fetch24hChange(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/price', { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.change ?? null
+  } catch {
+    return null
+  }
 }
 
 export function usePrice(refreshInterval = 5000) {
-  const [state, setState] = useState<PriceState>({
-    price: null,
-    change: null,
-    loading: true,
-    error: null,
-    lastUpdated: null,
+  const chainId = useChainId()
+  const contractAddress = FLASHBETS_ADDRESS[chainId as keyof typeof FLASHBETS_ADDRESS]
+  const hasContract = contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000'
+
+  const [change, setChange] = useState<number | null>(null)
+  const [cgLoading, setCgLoading] = useState(false)
+
+  // On-chain Chainlink price via contract
+  const {
+    data: btcPriceData,
+    isLoading: chainlinkLoading,
+    error: chainlinkError,
+    refetch: refetchChainlink,
+  } = useReadContract({
+    address: hasContract ? contractAddress : undefined,
+    abi: FLASHBETS_ABI,
+    functionName: 'getBtcPrice',
+    query: {
+      enabled: !!hasContract,
+      refetchInterval: refreshInterval,
+    },
   })
 
-  const fetchPrice = useCallback(async () => {
-    try {
-      const { price, change } = await fetchBTCPrice()
-      setState((prev) => ({
-        ...prev,
-        price,
-        change,
-        loading: false,
-        error: null,
-        lastUpdated: new Date(),
-      }))
-    } catch (err) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: err instanceof Error ? err.message : 'Failed to fetch price',
-      }))
-    }
+  // 24h change from CoinGecko (secondary, non-critical)
+  const fetch24h = useCallback(async () => {
+    setCgLoading(true)
+    const c = await fetch24hChange()
+    setChange(c)
+    setCgLoading(false)
   }, [])
 
   useEffect(() => {
-    // Fetch immediately on mount
-    fetchPrice()
+    fetch24h()
+    const id = setInterval(fetch24h, 60_000) // refresh every minute
+    return () => clearInterval(id)
+  }, [fetch24h])
 
-    // Set up interval for refreshing
-    const interval = setInterval(fetchPrice, refreshInterval)
+  // If no contract (mainnet not deployed), fall back to CoinGecko for price too
+  const [cgPrice, setCgPrice] = useState<number | null>(null)
+  const fetchCgPrice = useCallback(async () => {
+    if (hasContract) return
+    try {
+      const res = await fetch('/api/price', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setCgPrice(data.price ?? null)
+    } catch {
+      // ignore
+    }
+  }, [hasContract])
 
-    return () => clearInterval(interval)
-  }, [fetchPrice, refreshInterval])
+  useEffect(() => {
+    fetchCgPrice()
+    if (!hasContract) {
+      const id = setInterval(fetchCgPrice, refreshInterval)
+      return () => clearInterval(id)
+    }
+  }, [fetchCgPrice, hasContract, refreshInterval])
+
+  // Derive final price state
+  let price: number | null = null
+  let source: PriceState['source'] = null
+
+  if (hasContract && btcPriceData) {
+    // btcPriceData[0] = price (int256), btcPriceData[1] = updatedAt (uint256)
+    price = Number(btcPriceData[0]) / CHAINLINK_DECIMALS
+    source = 'chainlink'
+  } else if (!hasContract && cgPrice !== null) {
+    price = cgPrice
+    source = 'coingecko'
+  }
+
+  const loading = hasContract ? chainlinkLoading : cgLoading
+  const error = hasContract && chainlinkError ? 'Failed to fetch Chainlink price' : null
+
+  const refetch = useCallback(() => {
+    if (hasContract) {
+      refetchChainlink()
+    } else {
+      fetchCgPrice()
+    }
+    fetch24h()
+  }, [hasContract, refetchChainlink, fetchCgPrice, fetch24h])
 
   return {
-    ...state,
-    refetch: fetchPrice,
+    price,
+    change,
+    loading,
+    error,
+    lastUpdated: price !== null ? new Date() : null,
+    source,
+    refetch,
   }
 }
