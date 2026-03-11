@@ -6,7 +6,8 @@ import { parseAbiItem } from 'viem'
 import { formatEther } from 'viem'
 import { FLASHBETS_ADDRESS } from '@/lib/contract'
 
-// Block FlashBets was deployed on Base Sepolia
+// Earliest deployment block — Base Sepolia deploy. Mainnet deploy is block 43212798.
+// Using the lower of the two so getLogs works for both chains.
 const DEPLOY_BLOCK = 38714127n
 
 export interface RoundHistory {

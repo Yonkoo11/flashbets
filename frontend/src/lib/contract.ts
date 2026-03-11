@@ -1,6 +1,6 @@
 export const FLASHBETS_ADDRESS = {
   // Fill after deploying
-  8453:  '0x0000000000000000000000000000000000000000' as `0x${string}`, // Base mainnet
+  8453:  '0x8e39631FBfAB68Ff5739F576847Ba7795f5b3AcE' as `0x${string}`, // Base mainnet
   84532: '0xcA374e8bba8bd2BA0Aed26c4d425aA9aa7E058D0' as `0x${string}`, // Base Sepolia
 } as const
 
