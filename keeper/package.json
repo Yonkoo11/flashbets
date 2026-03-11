@@ -1,0 +1,18 @@
+{
+  "name": "flashbets-keeper",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun src/keeper.ts",
+    "admin": "bun src/admin.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "viem": "^2.47.1"
+  }
+}

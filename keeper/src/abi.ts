@@ -1,0 +1,52 @@
+export const ABI = [
+  {
+    name: 'getMarketInfo',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'roundId',          type: 'uint256' },
+      { name: 'startPrice',       type: 'int256'  },
+      { name: 'startTime',        type: 'uint256' },
+      { name: 'status',           type: 'uint8'   },
+      { name: 'upPool',           type: 'uint256' },
+      { name: 'downPool',         type: 'uint256' },
+      { name: 'secondsRemaining', type: 'uint256' },
+    ],
+  },
+  {
+    name: 'startNewMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'lockMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'resolveMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'cancelStaleRound',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'paused',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'bool' }],
+  },
+] as const
