@@ -1,105 +1,59 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
-interface TimerState {
-  secondsRemaining: number
-  isActive: boolean
-  roundId: number
-}
+const ROUND_DURATION = 60
 
-const ROUND_DURATION = 60 // 60 seconds per round
+/**
+ * useTimer — drives the countdown display.
+ *
+ * When `syncSeconds` is provided (from the contract's secondsRemaining),
+ * the timer snaps to that value and counts down locally for smooth UX.
+ * When the contract reports 0 or undefined, the timer shows 0 (idle).
+ */
+export function useTimer(syncSeconds?: number) {
+  const [seconds, setSeconds] = useState(0)
+  const [isActive, setIsActive] = useState(false)
+  const lastSync = useRef<number | undefined>(undefined)
 
-// Module-level variable to track interval - survives React re-renders
-let globalIntervalId: number | null = null
-let intervalCount = 0
-
-export function useTimer() {
-  const [state, setState] = useState<TimerState>({
-    secondsRemaining: ROUND_DURATION,
-    isActive: true,
-    roundId: 1,
-  })
-
-  const startNewRound = useCallback(() => {
-    setState({
-      secondsRemaining: ROUND_DURATION,
-      isActive: true,
-      roundId: Date.now(),
-    })
-  }, [])
-
+  // Sync from chain whenever it changes meaningfully
   useEffect(() => {
-    if (!state.isActive) {
-      // Clear interval when not active
-      if (globalIntervalId !== null) {
-          window.clearInterval(globalIntervalId)
-        globalIntervalId = null
-      }
-      return
-    }
+    if (syncSeconds === undefined) return
 
-    // Always clear any existing interval first
-    if (globalIntervalId !== null) {
-      window.clearInterval(globalIntervalId)
-      globalIntervalId = null
-    }
+    // Snap to chain value
+    setSeconds(syncSeconds)
+    setIsActive(syncSeconds > 0)
+    lastSync.current = syncSeconds
+  }, [syncSeconds])
 
-    // Create new interval
-    intervalCount++
-    const myIntervalNumber = intervalCount
-    globalIntervalId = window.setInterval(() => {
-      setState((prev) => {
-        if (!prev.isActive) {
-          return prev
+  // Local countdown between chain polls (smooth ticking)
+  useEffect(() => {
+    if (!isActive || seconds <= 0) return
+
+    const id = window.setInterval(() => {
+      setSeconds(prev => {
+        if (prev <= 1) {
+          setIsActive(false)
+          return 0
         }
-
-        if (prev.secondsRemaining <= 1) {
-          return {
-            ...prev,
-            secondsRemaining: 0,
-            isActive: false,
-          }
-        }
-
-        return {
-          ...prev,
-          secondsRemaining: prev.secondsRemaining - 1,
-        }
+        return prev - 1
       })
     }, 1000)
 
+    return () => window.clearInterval(id)
+  }, [isActive]) // only re-create interval when isActive changes
 
-    return () => {
-      if (globalIntervalId !== null) {
-        window.clearInterval(globalIntervalId)
-        globalIntervalId = null
-      }
-    }
-  }, [state.isActive, state.roundId])
-
-  // Auto-restart round after it ends
-  useEffect(() => {
-    if (!state.isActive && state.secondsRemaining === 0) {
-      const timeout = window.setTimeout(() => {
-        startNewRound()
-      }, 3000)
-
-      return () => window.clearTimeout(timeout)
-    }
-  }, [state.isActive, state.secondsRemaining, startNewRound])
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
+  const formatTime = (s: number): string => {
+    const mins = Math.floor(s / 60)
+    const secs = s % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
   return {
-    ...state,
-    formattedTime: formatTime(state.secondsRemaining),
-    isUrgent: state.secondsRemaining <= 10 && state.secondsRemaining > 0,
-    progress: (ROUND_DURATION - state.secondsRemaining) / ROUND_DURATION,
-    startNewRound,
+    secondsRemaining: seconds,
+    isActive,
+    formattedTime: formatTime(seconds),
+    isUrgent: seconds <= 10 && seconds > 0,
+    progress: (ROUND_DURATION - seconds) / ROUND_DURATION,
   }
 }

@@ -8,6 +8,7 @@ import { usePrice } from '@/hooks/usePrice'
 import { useTimer } from '@/hooks/useTimer'
 import { useHistory } from '@/hooks/useHistory'
 import { useSound } from '@/hooks/useSound'
+import { useChainEvents } from '@/hooks/useChainEvents'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { Confetti } from '@/components/Confetti'
 import type { BetDirection, MarketStatus } from '@/types'
@@ -39,9 +40,6 @@ export interface BettingInterfaceV2Props {
   onConnect: () => Promise<void>
   onDisconnect: () => void
   onPlaceBet: (direction: BetDirection, amount: number) => Promise<boolean>
-  onStartMarket: (startPrice: number) => Promise<boolean>
-  onLockMarket: () => Promise<boolean>
-  onResolveMarket: (endPrice: number) => Promise<boolean>
   onClaimWinnings?: () => Promise<void>
   onRefresh: () => void
 }
@@ -57,9 +55,6 @@ export function BettingInterfaceV2({
   onConnect,
   onDisconnect,
   onPlaceBet,
-  onStartMarket,
-  onLockMarket,
-  onResolveMarket,
   onClaimWinnings,
   onRefresh,
 }: BettingInterfaceV2Props) {
@@ -68,134 +63,60 @@ export function BettingInterfaceV2({
   const [showResult, setShowResult] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
   const [lastResult, setLastResult] = useState<{ userWon: boolean; profit: number } | null>(null)
-  const [marketStarted, setMarketStarted] = useState(false)
   const [lastResultRound, setLastResultRound] = useState<number>(0)
   const [isBetting, setIsBetting] = useState(false)
 
-  // Track which round we last attempted lifecycle calls for (prevent double-fires within the UI)
-  const lifecycleRoundRef = useRef<number>(0)
-
   const price   = usePrice()
-  const timer   = useTimer()
+  const timer   = useTimer(secondsRemainingFromChain)
   const { history, addEntry } = useHistory()
   const { addToast } = useToast()
   const { play: playSound } = useSound()
+  const { leaderboard } = useChainEvents()
 
   // RainbowKit hooks for connect/disconnect modals
   const { openConnectModal }  = useConnectModal()
   const { openAccountModal }  = useAccountModal()
   const { disconnect }        = useDisconnect()
 
-  // ---- Sync local display timer with authoritative on-chain time ----
-  // When the chain reports a fresh round (secondsRemaining near 60), restart local timer.
-  // This keeps the display accurate without polling block timestamps every tick.
-  const prevChainSeconds = useRef<number | null>(null)
+  // ---- Detect round resolution and show result to user ----
+  const prevStatus = useRef<MarketStatus | null>(null)
   useEffect(() => {
-    if (secondsRemainingFromChain === undefined) return
-    const prev = prevChainSeconds.current
-    // New round started: chain seconds jumped back up (or first load)
-    if (prev !== null && secondsRemainingFromChain > prev + 5) {
-      timer.startNewRound()
-    }
-    prevChainSeconds.current = secondsRemainingFromChain
-  }, [secondsRemainingFromChain]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---- Market lifecycle (driven by local timer for fast UX; contract guards against early calls) ----
-  useEffect(() => {
-    if (!isConnected || !price.price) return
     const currentRound = market?.roundId ?? 0
-
-    // Start a new round when the previous one resolved and timer is fresh
     if (
-      timer.isActive &&
-      timer.secondsRemaining > 50 &&
-      (!market || market.status === 'RESOLVED' || market.status === 'INACTIVE') &&
-      !marketStarted
+      prevStatus.current === 'LOCKED' &&
+      market?.status === 'RESOLVED' &&
+      userBet &&
+      lastResultRound !== currentRound
     ) {
-      setMarketStarted(true)
-      onStartMarket(price.price).then(() => {
-        setTimeout(onRefresh, 2000)
-        setSelectedDirection(null)
-        setSelectedAmount(null)
+      const outcome: BetDirection = price.price! > market.startPrice ? 'UP' : 'DOWN'
+      const userWon  = userBet.direction === outcome
+      const profit   = userWon
+        ? userBet.potentialPayout - userBet.amount
+        : -userBet.amount
+
+      setLastResult({ userWon, profit })
+      setShowResult(true)
+      setLastResultRound(currentRound)
+
+      playSound(userWon ? 'win' : 'lose')
+
+      addEntry({
+        direction: userBet.direction,
+        amount:    userBet.amount,
+        outcome:   userWon ? 'WIN' : 'LOSS',
+        profit,
       })
+
+      addToast(
+        userWon
+          ? `Won +${profit.toFixed(4)} ETH!`
+          : `Lost ${Math.abs(profit).toFixed(4)} ETH`,
+        userWon ? 'success' : 'error',
+        5000,
+      )
     }
-
-    if (market?.status === 'ACTIVE') {
-      setMarketStarted(false)
-    }
-
-    // Lock in last 10 seconds
-    if (
-      timer.isActive &&
-      timer.secondsRemaining <= 10 &&
-      timer.secondsRemaining > 5 &&
-      market?.status === 'ACTIVE' &&
-      lifecycleRoundRef.current !== currentRound
-    ) {
-      onLockMarket().then(() => setTimeout(onRefresh, 2000))
-    }
-
-    // Resolve when timer hits 0 on a locked round
-    if (
-      !timer.isActive &&
-      timer.secondsRemaining === 0 &&
-      market?.status === 'LOCKED' &&
-      lifecycleRoundRef.current !== currentRound
-    ) {
-      lifecycleRoundRef.current = currentRound
-
-      onResolveMarket(price.price).then(() => {
-        setTimeout(() => {
-          onRefresh()
-
-          if (userBet && lastResultRound !== currentRound) {
-            const outcome: BetDirection = price.price! > market.startPrice ? 'UP' : 'DOWN'
-            const userWon  = userBet.direction === outcome
-            const profit   = userWon
-              ? userBet.potentialPayout - userBet.amount
-              : -userBet.amount
-
-            setLastResult({ userWon, profit })
-            setShowResult(true)
-            setLastResultRound(currentRound)
-
-            playSound(userWon ? 'win' : 'lose')
-
-            addEntry({
-              direction: userBet.direction,
-              amount:    userBet.amount,
-              outcome:   userWon ? 'WIN' : 'LOSS',
-              profit,
-            })
-
-            addToast(
-              userWon
-                ? `Won +${profit.toFixed(4)} ETH!`
-                : `Lost ${Math.abs(profit).toFixed(4)} ETH`,
-              userWon ? 'success' : 'error',
-              5000,
-            )
-          }
-        }, 2000)
-      })
-    }
-  }, [
-    timer.isActive,
-    timer.secondsRemaining,
-    price.price,
-    market,
-    userBet,
-    isConnected,
-    marketStarted,
-    lastResultRound,
-    onStartMarket,
-    onLockMarket,
-    onResolveMarket,
-    onRefresh,
-    addEntry,
-    addToast,
-    playSound,
-  ])
+    prevStatus.current = market?.status ?? null
+  }, [market?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Handlers ----
 
@@ -266,7 +187,7 @@ export function BettingInterfaceV2({
   const upOdds    = market?.upOdds   ?? 1.95
   const downOdds  = market?.downOdds ?? 1.95
   const totalPool = market?.totalPool ?? 0
-  const roundId   = market?.roundId  ?? 1
+  const roundId   = market?.roundId  ?? 0
 
   const hasCurrentBet = !!(userBet && userBet.amount > 0)
   const canPlaceBet   = (
@@ -288,6 +209,7 @@ export function BettingInterfaceV2({
 
   const isUrgent   = timer.secondsRemaining <= 10 && timer.secondsRemaining > 0
   const isRoundOver = !timer.isActive && timer.secondsRemaining === 0
+  const isWaiting  = marketStatus === 'INACTIVE' || marketStatus === 'RESOLVED'
 
   const displayAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
@@ -334,15 +256,21 @@ export function BettingInterfaceV2({
               aria-live="polite"
               aria-atomic="true"
             >
-              {isRoundOver
-                ? '00'
-                : timer.secondsRemaining < 10
-                  ? `0${timer.secondsRemaining}`
-                  : `${timer.secondsRemaining}`}
+              {isWaiting
+                ? '--'
+                : isRoundOver
+                  ? '00'
+                  : timer.secondsRemaining < 10
+                    ? `0${timer.secondsRemaining}`
+                    : `${timer.secondsRemaining}`}
             </div>
           </div>
           <div className="fb-timer-label" aria-hidden="true">
-            {isRoundOver ? 'Round complete' : 'seconds remaining'}
+            {isWaiting
+              ? 'Waiting for next round'
+              : isRoundOver
+                ? 'Round complete'
+                : 'seconds remaining'}
           </div>
           <div className={`fb-warning-light ${isUrgent ? 'urgent' : ''}`} />
 
@@ -498,7 +426,7 @@ export function BettingInterfaceV2({
         {/* ---- Scrollable feed sections ---- */}
         <div className="fb-feed-wrapper">
 
-          {/* Live Activity */}
+          {/* Live Activity — real on-chain leaderboard data */}
           <section className="fb-feed-section">
             <div className="fb-feed-header">
               <h2 className="fb-feed-title">
@@ -507,71 +435,46 @@ export function BettingInterfaceV2({
               </h2>
             </div>
             <div className="fb-activity-list">
-              {[
-                { addr: '0x7a3f...9e21', dir: 'UP',   amount: '0.01',  time: '2s ago'  },
-                { addr: '0x4b2c...1d8a', dir: 'DOWN', amount: '0.005', time: '5s ago'  },
-                { addr: '0x9f1e...3c7b', dir: 'UP',   amount: '0.025', time: '12s ago' },
-                { addr: '0x2d8a...7f4e', dir: 'UP',   amount: '0.008', time: '18s ago' },
-                { addr: '0x6c3b...2a9d', dir: 'DOWN', amount: '0.015', time: '24s ago' },
-                { addr: '0x1e7f...8b3c', dir: 'UP',   amount: '0.05',  time: '31s ago' },
-              ].map((a, i) => (
-                <div key={i} className="fb-activity-row" style={{ animationDelay: `${i * 0.08}s` }}>
-                  <span className="fb-activity-addr">{a.addr}</span>
-                  <span className={`fb-activity-dir ${a.dir === 'UP' ? 'up' : 'down'}`}>
-                    {a.dir === 'UP' ? '▲ GREEN' : '▼ RED'}
-                  </span>
-                  <span className="fb-activity-amount">{a.amount} ETH</span>
-                  <span className="fb-activity-time">{a.time}</span>
+              {leaderboard.length === 0 ? (
+                <div className="fb-activity-row" style={{ opacity: 0.5, justifyContent: 'center' }}>
+                  No bets yet — be the first!
                 </div>
-              ))}
+              ) : (
+                leaderboard.slice(0, 6).map((entry, i) => (
+                  <div key={i} className="fb-activity-row" style={{ animationDelay: `${i * 0.08}s` }}>
+                    <span className="fb-activity-addr">{entry.address}</span>
+                    <span className={`fb-activity-dir ${entry.profit >= 0 ? 'up' : 'down'}`}>
+                      {entry.totalBets} bets
+                    </span>
+                    <span className="fb-activity-amount">{entry.totalBet.toFixed(3)} ETH</span>
+                    <span className="fb-activity-time">{entry.winRate}% win</span>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
-          {/* Recent Results */}
-          <section className="fb-feed-section">
-            <div className="fb-feed-header">
-              <h2 className="fb-feed-title">Recent Results</h2>
-            </div>
-            <div className="fb-results-grid">
-              {[
-                { round: Math.max(1, roundId - 1), result: 'UP',   change: '+0.12%' },
-                { round: Math.max(1, roundId - 2), result: 'DOWN', change: '-0.08%' },
-                { round: Math.max(1, roundId - 3), result: 'UP',   change: '+0.23%' },
-                { round: Math.max(1, roundId - 4), result: 'UP',   change: '+0.05%' },
-                { round: Math.max(1, roundId - 5), result: 'DOWN', change: '-0.15%' },
-              ].filter(r => r.round > 0).map((r, i) => (
-                <div key={i} className={`fb-result-tile ${r.result === 'UP' ? 'won-up' : 'won-down'}`} style={{ animationDelay: `${i * 0.1}s` }}>
-                  <span className="fb-result-round">#{r.round}</span>
-                  <span className={`fb-result-outcome ${r.result === 'UP' ? 'up' : 'down'}`}>
-                    {r.result === 'UP' ? '▲' : '▼'}
-                  </span>
-                  <span className="fb-result-change">{r.change}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Top Traders */}
+          {/* Top Traders — real on-chain data */}
           <section className="fb-feed-section">
             <div className="fb-feed-header">
               <h2 className="fb-feed-title">Top Traders</h2>
               <a href="/leaderboard" className="fb-feed-link">View All →</a>
             </div>
             <div className="fb-mini-leaderboard">
-              {[
-                { rank: 1, addr: '0x1234...5678', profit: '1.25',  winRate: 68 },
-                { rank: 2, addr: '0xabcd...efgh', profit: '0.89',  winRate: 62 },
-                { rank: 3, addr: '0x9876...5432', profit: '0.72',  winRate: 59 },
-                { rank: 4, addr: '0xdef0...1234', profit: '0.56',  winRate: 57 },
-                { rank: 5, addr: '0x5678...9abc', profit: '0.48',  winRate: 55 },
-              ].map((trader) => (
-                <div key={trader.rank} className="fb-mini-row">
-                  <span className={`fb-mini-rank rank-${trader.rank}`}>#{trader.rank}</span>
-                  <span className="fb-mini-addr">{trader.addr}</span>
-                  <span className="fb-mini-winrate">{trader.winRate}%</span>
-                  <span className="fb-mini-profit">+{trader.profit} ETH</span>
+              {leaderboard.length === 0 ? (
+                <div className="fb-mini-row" style={{ opacity: 0.5, justifyContent: 'center' }}>
+                  No traders yet
                 </div>
-              ))}
+              ) : (
+                leaderboard.slice(0, 5).map((trader, i) => (
+                  <div key={i} className="fb-mini-row">
+                    <span className={`fb-mini-rank rank-${i + 1}`}>#{i + 1}</span>
+                    <span className="fb-mini-addr">{trader.address}</span>
+                    <span className="fb-mini-winrate">{trader.winRate}%</span>
+                    <span className="fb-mini-profit">{trader.profit >= 0 ? '+' : ''}{trader.profit.toFixed(3)} ETH</span>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
@@ -643,7 +546,7 @@ export function BettingInterfaceV2({
             Base Sepolia
           </div>
           <span>Round #{roundId}</span>
-          <span>v0.2.0</span>
+          <span>v0.3.0</span>
         </footer>
       </div>
 
